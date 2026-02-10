@@ -203,11 +203,21 @@
     </div>
 
     <script>
-        // State
-        let dailyRuns = 3;
-        let maxEnk = 120;
-        let isHard = false;
-        let hardStyle = 'bulk';
+        /**
+         * 데이터 저장/불러오기 로직 추가
+         */
+        const STORAGE_KEYS = {
+            DAILY_RUNS: 'lcb_md_calc_dailyRuns',
+            MAX_ENK: 'lcb_md_calc_maxEnk',
+            IS_HARD: 'lcb_md_calc_isHard',
+            HARD_STYLE: 'lcb_md_calc_hardStyle'
+        };
+
+        // 초기 상태 설정 (저장된 값이 있으면 불러오고, 없으면 기본값 사용)
+        let dailyRuns = parseInt(localStorage.getItem(STORAGE_KEYS.DAILY_RUNS)) || 3;
+        let maxEnk = parseInt(localStorage.getItem(STORAGE_KEYS.MAX_ENK)) || 120;
+        let isHard = localStorage.getItem(STORAGE_KEYS.IS_HARD) === 'true';
+        let hardStyle = localStorage.getItem(STORAGE_KEYS.HARD_STYLE) || 'bulk';
 
         // Constants
         const BOXES_PER_LEVEL = 3;
@@ -223,6 +233,11 @@
         const elIsHardInput = document.getElementById('input-is-hard');
         const elBtnBulk = document.getElementById('btn-bulk');
         const elBtnEach = document.getElementById('btn-each');
+
+        // 페이지 로드 시 초기값 UI 반영
+        elDailyRunsInput.value = dailyRuns;
+        elMaxEnkInput.value = maxEnk;
+        elIsHardInput.checked = isHard;
 
         function updateUI() {
             const weeklyRuns = dailyRuns * 7;
@@ -312,16 +327,34 @@
             document.getElementById('res-weeks-needed').textContent = weeksForOne;
         }
 
-        elDailyRunsInput.addEventListener('input', (e) => { dailyRuns = parseInt(e.target.value); updateUI(); });
+        // Event Listeners + 데이터 저장
+        elDailyRunsInput.addEventListener('input', (e) => { 
+            dailyRuns = parseInt(e.target.value); 
+            localStorage.setItem(STORAGE_KEYS.DAILY_RUNS, dailyRuns);
+            updateUI(); 
+        });
         elMaxEnkInput.addEventListener('input', (e) => { 
             let val = parseInt(e.target.value);
             if(isNaN(val)) val = 0;
             maxEnk = val; 
+            localStorage.setItem(STORAGE_KEYS.MAX_ENK, maxEnk);
             updateUI(); 
         });
-        elIsHardInput.addEventListener('change', (e) => { isHard = e.target.checked; updateUI(); });
-        elBtnBulk.addEventListener('click', () => { hardStyle = 'bulk'; updateUI(); });
-        elBtnEach.addEventListener('click', () => { hardStyle = 'each'; updateUI(); });
+        elIsHardInput.addEventListener('change', (e) => { 
+            isHard = e.target.checked; 
+            localStorage.setItem(STORAGE_KEYS.IS_HARD, isHard);
+            updateUI(); 
+        });
+        elBtnBulk.addEventListener('click', () => { 
+            hardStyle = 'bulk'; 
+            localStorage.setItem(STORAGE_KEYS.HARD_STYLE, hardStyle);
+            updateUI(); 
+        });
+        elBtnEach.addEventListener('click', () => { 
+            hardStyle = 'each'; 
+            localStorage.setItem(STORAGE_KEYS.HARD_STYLE, hardStyle);
+            updateUI(); 
+        });
 
         updateUI();
     </script>
