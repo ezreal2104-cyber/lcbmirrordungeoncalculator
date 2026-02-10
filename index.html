@@ -1,340 +1,313 @@
-import React, { useState, useMemo } from 'react';
-
-/**
- * 림버스 컴퍼니 거울 던전 효율 계산기 (UI 최적화 버전)
- * - 하드 모드 UI 늘어짐 방지 및 레이아웃 안정화
- * - 복잡한 수식 제거 및 직관적인 가동 리포트
- * - 사용자 오해 방지를 위한 하드 모드 카운트 안내 추가
- */
-
-const App = () => {
-  const [dailyRuns, setDailyRuns] = useState(3);
-  const [maxEnkephalin, setMaxEnkephalin] = useState(120);
-  const [isHardMode, setIsHardMode] = useState(false);
-  const [hardStyle, setHardStyle] = useState('bulk'); 
-
-  // --- 시스템 상수 ---
-  const BOXES_PER_LEVEL = 3;
-  const SHARDS_PER_BOX_EXPECTATION = 2;
-  const SHARDS_FOR_IDENTITY = 400;
-  
-  const DAILY_QUEST_LEVEL = 1; 
-  const WEEKLY_QUEST_LEVEL = 2; 
-  const MD_NORMAL_LEVEL = 3; 
-
-  const MODULES_PER_RUN = 5;
-  const ENKEPHALIN_PER_MODULE = 20;
-
-  const calculations = useMemo(() => {
-    const weeklyRuns = dailyRuns * 7;
-    const questLevels = (DAILY_QUEST_LEVEL * 7) + WEEKLY_QUEST_LEVEL; 
-    
-    let mdBonusLevels = 0;
-    let bonusRunsCount = 0;
-
-    if (isHardMode) {
-      if (hardStyle === 'bulk') {
-        mdBonusLevels = 22.5; // 하드 1판으로 3회분 일괄 수령
-        bonusRunsCount = 1;
-      } else {
-        mdBonusLevels = 25;   // 하드 3판 각각 클리어
-        bonusRunsCount = 3;
-      }
-    } else {
-      bonusRunsCount = Math.min(weeklyRuns, 3);
-      mdBonusLevels = bonusRunsCount * 4.5;
-    }
-
-    const remainingRuns = Math.max(0, weeklyRuns - bonusRunsCount);
-    const mdLevels = mdBonusLevels + (remainingRuns * MD_NORMAL_LEVEL);
-
-    const totalWeeklyLevels = questLevels + mdLevels;
-    const flooredLevels = Math.floor(totalWeeklyLevels);
-    const weeklyBoxes = flooredLevels * BOXES_PER_LEVEL;
-    const weeklyShards = weeklyBoxes * SHARDS_PER_BOX_EXPECTATION;
-    const identitiesPerWeek = (weeklyShards / SHARDS_FOR_IDENTITY).toFixed(2);
-    const weeksForOneIdentity = (SHARDS_FOR_IDENTITY / weeklyShards).toFixed(1);
-
-    // 자원 관리 (공급: 자연회복 240 + 2충)
-    const dailyNaturalEnkephalin = 240; 
-    const dailyRefillEnkephalin = maxEnkephalin * 2;
-    const totalDailyEnkephalin = dailyNaturalEnkephalin + dailyRefillEnkephalin;
-    const totalDailyAvailableModules = Math.floor(totalDailyEnkephalin / ENKEPHALIN_PER_MODULE);
-
-    const dailyMDModules = dailyRuns * MODULES_PER_RUN;
-    const remainingModules = totalDailyAvailableModules - dailyMDModules;
-
-    const isCritical = remainingModules < 0;
-    const isTight = !isCritical && remainingModules < 10;
-
-    return {
-      weeklyRuns,
-      totalWeeklyLevels,
-      flooredLevels,
-      weeklyBoxes,
-      weeklyShards,
-      identitiesPerWeek,
-      weeksForOneIdentity,
-      dailyMDModules,
-      dailyMDEnkephalin: dailyMDModules * ENKEPHALIN_PER_MODULE,
-      totalDailyAvailableModules,
-      remainingModules,
-      isCritical,
-      isTight,
-      bonusRunsCount,
-      remainingRuns,
-      mdBonusLevels
-    };
-  }, [dailyRuns, maxEnkephalin, isHardMode, hardStyle]);
-
-  return (
-    <div className="min-h-screen bg-black text-neutral-200 p-4 font-sans flex flex-col items-center selection:bg-red-900">
-      <div className="w-full max-w-xl">
-        
-        {/* Header */}
-        <header className="flex flex-col py-6 border-b border-red-900 mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="text-red-700">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCB: 거던 효율 계산기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: black; }
+        input[type=range]::-webkit-slider-runnable-track { background: #1f2937; border-radius: 999px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; background: #b91c1c; height: 16px; width: 16px; border-radius: 50%; margin-top: -4px; }
+        .slider-vertical { writing-mode: bt-lr; appearance: slider-vertical; width: 8px; height: 150px; }
+    </style>
+</head>
+<body class="text-neutral-200 p-4 flex flex-col items-center">
+    <div class="w-full max-w-xl">
+        <!-- Header -->
+        <header class="flex flex-col py-6 border-b border-red-900 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="text-red-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                </div>
+                <h1 class="text-xl font-black italic uppercase tracking-tighter leading-none text-white">LCB: 거던 효율 계산기</h1>
             </div>
-            <h1 className="text-xl font-black italic uppercase tracking-tighter leading-none text-white">LCB: 거던 효율 계산기</h1>
-          </div>
-          
-          <div className="bg-red-950/20 border border-red-900/40 p-3 rounded flex items-start gap-2">
-            <div className="text-red-500 mt-0.5">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            <div class="bg-red-950/20 border border-red-900/40 p-3 rounded flex items-start gap-2">
+                <div class="text-red-500 mt-0.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                </div>
+                <p class="text-[11px] text-neutral-400 leading-snug">
+                    본 계산기는 <span class="text-white font-bold underline">패스 일일/주간 퀘스트, 주간 추가 보상, 일일 2회 충전</span>을 수행함을 전제로 산출되었습니다.
+                </p>
             </div>
-            <p className="text-[11px] text-neutral-400 leading-snug">
-              본 계산기는 <span className="text-white font-bold underline">패스 일일/주간 퀘스트, 주간 추가 보상, 일일 2회 충전</span>을 
-              수행함을 전제로 산출되었습니다.
-            </p>
-          </div>
         </header>
 
-        <main className="space-y-6">
-          {/* 가동 설정 섹션 */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-red-700"></div>
-            
-            {/* 경고/권고 메시지 영역 (공간 고정) */}
-            <div className="min-h-[80px] flex flex-col justify-center mb-6">
-              {calculations.isCritical && (
-                <div className="bg-red-950/40 border border-red-600 p-3 rounded flex items-center gap-3 animate-pulse">
-                  <div className="text-red-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-                  </div>
-                  <div className="text-[11px] text-red-100 font-bold leading-tight">
-                    [공급 한계 도달] 필요 모듈량이 일일 총 수급량({calculations.totalDailyAvailableModules}개)을 초과했습니다.<br/>
-                    현재의 에너지 충전 계획으로는 해당 빈도의 가동을 감당할 수 없습니다.
-                  </div>
+        <main class="space-y-6">
+            <!-- 가동 설정 섹션 -->
+            <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-red-700"></div>
+                
+                <!-- 경고/권고 메시지 영역 -->
+                <div id="alert-area" class="min-h-[80px] flex flex-col justify-center mb-6"></div>
+
+                <div class="flex gap-8 items-stretch">
+                    <!-- 왼쪽: 엔케팔린 최대치 -->
+                    <div class="flex flex-col items-center gap-3 py-2">
+                        <div class="flex flex-col items-center">
+                            <span class="text-[9px] font-black text-neutral-500 uppercase tracking-widest mb-1 leading-none">Max ENK</span>
+                            <span id="display-max-enk" class="text-xl font-black text-white leading-none">120</span>
+                        </div>
+                        <div class="relative flex-1 py-2 flex items-center justify-center min-w-[30px]">
+                            <input type="range" id="input-max-enk" min="60" max="200" step="1" value="120" class="slider-vertical accent-neutral-500">
+                        </div>
+                        <span class="text-[8px] text-neutral-600 font-bold uppercase tracking-widest leading-none">Min 60</span>
+                    </div>
+
+                    <!-- 오른쪽: 거던 가동 횟수 -->
+                    <div class="flex-1 flex flex-col justify-between py-2">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h2 class="text-xs font-bold text-neutral-400 uppercase tracking-widest leading-none">일일 거던 빈도</h2>
+                                <p class="text-[10px] text-neutral-500 italic mt-1 leading-none">Daily Operation Rate</p>
+                            </div>
+                            <div class="text-right flex flex-col items-end">
+                                <div class="flex items-baseline leading-none">
+                                    <span id="display-daily-runs" class="text-5xl font-black leading-none tracking-tighter text-white">3</span>
+                                    <span class="text-red-700 font-bold ml-1 text-xl italic font-serif leading-none">회</span>
+                                </div>
+                                <div id="display-module-cost" class="mt-2 text-neutral-400 font-bold text-[11px] leading-none">
+                                    소모: 15모듈 <span class="text-[9px] ml-1 font-normal text-neutral-600">(300 ENK)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <input type="range" id="input-daily-runs" min="1" max="15" step="1" value="3" class="w-full h-2 rounded-lg appearance-none cursor-pointer accent-red-700 bg-neutral-800">
+                            <div class="flex justify-between text-[9px] text-neutral-600 mt-4 font-mono font-bold uppercase tracking-tighter leading-none">
+                                <span>최소 가동</span>
+                                <span id="display-available-modules" class="text-neutral-500 font-normal">수급 가능 모듈: 24개</span>
+                                <span>최대 가동</span>
+                            </div>
+                        </div>
+
+                        <!-- 하드 모드 설정 -->
+                        <div class="mt-6 pt-4 border-t border-neutral-800 min-h-[110px]">
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="checkbox" id="input-is-hard" class="w-4 h-4 accent-red-600 bg-neutral-800 border-zinc-700 rounded cursor-pointer">
+                                    <span id="hard-label" class="text-xs font-bold transition-colors text-neutral-500 group-hover:text-neutral-300">보너스 하드 모드 적용</span>
+                                </label>
+                            </div>
+
+                            <div id="hard-style-options" class="hidden flex gap-2">
+                                <button id="btn-bulk" class="flex-1 flex flex-col items-center p-3 rounded border border-red-800 bg-red-950/30 transition-all">
+                                    <span class="text-xs font-black text-red-500">3회분 일괄 수령</span>
+                                    <span class="text-[9px] text-zinc-600 font-bold mt-1 uppercase leading-none italic">하드 1판 소모</span>
+                                </button>
+                                <button id="btn-each" class="flex-1 flex flex-col items-center p-3 rounded border border-neutral-800 bg-neutral-950 hover:border-neutral-700 transition-all">
+                                    <span class="text-xs font-black text-neutral-500">3회 각각 클리어</span>
+                                    <span class="text-[9px] text-zinc-600 font-bold mt-1 uppercase leading-none italic">하드 3판 소모</span>
+                                </button>
+                            </div>
+                            <div id="normal-bonus-placeholder" class="flex items-center justify-center h-[58px] border border-dashed border-neutral-800 rounded opacity-20 text-[10px] uppercase font-bold tracking-widest">
+                                Normal MD Bonus Only
+                            </div>
+                            <p id="hard-notice" class="hidden mt-3 text-[9px] text-neutral-600 italic leading-none">
+                                ※ 하드 모드 클리어 횟수는 주간 가동 총합에 포함됩니다.
+                            </p>
+                        </div>
+                    </div>
                 </div>
-              )}
-              {calculations.isTight && (
-                <div className="bg-orange-950/20 border border-orange-700/40 p-3 rounded flex items-center gap-3">
-                  <div className="text-orange-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-                  </div>
-                  <div className="text-[11px] text-orange-200 font-bold leading-tight">
-                    [운용 권고] 거던 후 잔여 모듈이 <span className="text-white underline">{calculations.remainingModules}개</span>입니다.<br/>
-                    경던 및 끈던 가동 계획에 차질이 없나 확인하세요.
-                  </div>
-                </div>
-              )}
             </div>
 
-            <div className="flex gap-8 items-stretch">
-              {/* 왼쪽: 엔케팔린 최대치 (수직 슬라이더) */}
-              <div className="flex flex-col items-center gap-3 py-2">
-                <div className="flex flex-col items-center">
-                   <span className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mb-1 leading-none">Max ENK</span>
-                   <span className="text-xl font-black text-white leading-none">{maxEnkephalin}</span>
-                </div>
-                <div className="relative flex-1 py-2 flex items-center justify-center min-w-[30px]">
-                  <input
-                    type="range"
-                    min="60"
-                    max="200"
-                    step="1"
-                    value={maxEnkephalin}
-                    onChange={(e) => setMaxEnkephalin(parseInt(e.target.value))}
-                    className="h-[150px] accent-neutral-500 cursor-pointer"
-                    style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' }}
-                  />
-                </div>
-                <span className="text-[8px] text-neutral-600 font-bold uppercase tracking-widest leading-none">Min 60</span>
-              </div>
-
-              {/* 오른쪽: 거던 가동 횟수 및 모드 설정 */}
-              <div className="flex-1 flex flex-col justify-between py-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest leading-none">일일 거던 빈도</h2>
-                    <p className="text-[10px] text-neutral-500 italic mt-1 leading-none font-sans">Daily Operation Rate</p>
-                  </div>
-                  <div className="text-right flex flex-col items-end">
-                    <div className="flex items-baseline leading-none">
-                      <span className={`text-5xl font-black leading-none tracking-tighter ${calculations.isCritical ? 'text-red-500' : 'text-white'}`}>
-                        {dailyRuns}
-                      </span>
-                      <span className="text-red-700 font-bold ml-1 text-xl italic font-serif leading-none">회</span>
+            <!-- 결과 리포트 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <article class="bg-neutral-900 border border-neutral-800 p-5 flex flex-col rounded-md shadow-lg">
+                    <div class="flex items-center gap-2 mb-4 leading-none font-black text-neutral-500 text-[10px] uppercase tracking-widest italic">
+                        <div class="w-1 h-3 bg-red-700"></div>
+                        주간 가동 분석 리포트
                     </div>
-                    <div className="mt-2 text-neutral-400 font-bold text-[11px] leading-none">
-                      소모: {calculations.dailyMDModules}모듈 
-                      <span className="text-[9px] ml-1 font-normal text-neutral-600 font-sans">
-                        ({calculations.dailyMDEnkephalin} ENK)
-                      </span>
+                    <div class="mb-4 p-3 bg-black/50 rounded border border-neutral-800 text-[10px] space-y-3 font-mono">
+                        <div class="flex justify-between items-center leading-none">
+                            <span class="text-red-500 font-bold">보너스 가동 횟수</span>
+                            <span id="res-bonus-runs" class="text-neutral-300 font-bold">3회</span>
+                        </div>
+                        <div class="flex justify-between items-center leading-none">
+                            <span class="text-neutral-400 font-bold">일반 가동 횟수</span>
+                            <span id="res-normal-runs" class="text-neutral-300 font-bold">18회</span>
+                        </div>
+                        <div class="pt-2 mt-1 border-t border-neutral-800 flex justify-between text-neutral-300 font-black leading-none">
+                            <span class="uppercase tracking-tighter text-neutral-500">주간 가동 총합</span>
+                            <span id="res-total-runs" class="text-white underline underline-offset-4">21회</span>
+                        </div>
                     </div>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <input
-                    type="range"
-                    min="1"
-                    max="15"
-                    step="1"
-                    value={dailyRuns}
-                    onChange={(e) => setDailyRuns(parseInt(e.target.value))}
-                    className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${calculations.isCritical ? 'accent-red-500 bg-red-900/20' : 'accent-red-700 bg-neutral-800'}`}
-                  />
-                  <div className="flex justify-between text-[9px] text-neutral-600 mt-4 font-mono font-bold uppercase tracking-tighter leading-none">
-                    <span>최소 가동</span>
-                    <span className="text-neutral-500 font-normal">수급 가능 모듈: {calculations.totalDailyAvailableModules}개</span>
-                    <span>최대 가동</span>
-                  </div>
-                </div>
-
-                {/* 하드 모드 설정 섹션 (고정된 높이로 늘어짐 방지) */}
-                <div className="mt-6 pt-4 border-t border-neutral-800 min-h-[110px]">
-                  <div className="flex justify-between items-center mb-4">
-                    <label className="flex items-center gap-2 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        checked={isHardMode}
-                        onChange={(e) => setIsHardMode(e.target.checked)}
-                        className="w-4 h-4 accent-red-600 bg-neutral-800 border-zinc-700 rounded cursor-pointer"
-                      />
-                      <span className={`text-xs font-bold transition-colors ${isHardMode ? 'text-red-500' : 'text-neutral-500 group-hover:text-neutral-300'}`}>
-                        보너스 하드 모드 적용
-                      </span>
-                    </label>
-                  </div>
-
-                  {isHardMode ? (
-                    <div className="flex gap-2 animate-in fade-in slide-in-from-left-2">
-                      <button
-                        onClick={() => setHardStyle('bulk')}
-                        className={`flex-1 flex flex-col items-center p-3 rounded border transition-all ${
-                          hardStyle === 'bulk' 
-                            ? 'bg-red-950/30 border-red-800 shadow-[inset_0_0_10px_rgba(153,27,27,0.2)]' 
-                            : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
-                        }`}
-                      >
-                        <span className={`text-xs font-black ${hardStyle === 'bulk' ? 'text-red-500' : 'text-neutral-500'}`}>3회분 일괄 수령</span>
-                        <span className="text-[9px] text-zinc-600 font-bold mt-1 leading-none uppercase italic">하드 1판 소모</span>
-                      </button>
-                      <button
-                        onClick={() => setHardStyle('each')}
-                        className={`flex-1 flex flex-col items-center p-3 rounded border transition-all ${
-                          hardStyle === 'each' 
-                            ? 'bg-red-950/30 border-red-800 shadow-[inset_0_0_10px_rgba(153,27,27,0.2)]' 
-                            : 'bg-neutral-950 border-neutral-800 hover:border-zinc-700'
-                        }`}
-                      >
-                        <span className={`text-xs font-black ${hardStyle === 'each' ? 'text-red-500' : 'text-neutral-500'}`}>3회 각각 클리어</span>
-                        <span className="text-[9px] text-zinc-600 font-bold mt-1 leading-none uppercase italic">하드 3판 소모</span>
-                      </button>
+                    <div class="space-y-4 flex-1">
+                        <div class="flex justify-between items-end leading-none">
+                            <div class="flex flex-col leading-none">
+                                <span class="text-xs text-neutral-400 leading-none">주간 합산 레벨</span>
+                                <span id="res-total-levels" class="text-[9px] text-neutral-500 leading-none tracking-tight">최종 67.5 Lv</span>
+                            </div>
+                            <span class="text-lg font-bold text-white leading-none"><span id="res-floored-levels">67</span> <small class="text-[10px] text-neutral-600 font-normal underline uppercase">Lv</small></span>
+                        </div>
+                        <div class="flex justify-between items-end leading-none">
+                            <span class="text-xs text-neutral-400 leading-none">파편 상자 획득</span>
+                            <span id="res-total-boxes" class="text-lg font-bold text-red-600 leading-none">201 <small class="text-[10px] text-neutral-600 font-normal uppercase font-serif">ea</small></span>
+                        </div>
+                        <div class="flex justify-between items-end pt-2 border-t border-neutral-800 leading-none">
+                            <span class="text-xs font-bold text-neutral-300 italic tracking-tighter">파편 기대값</span>
+                            <span id="res-total-shards" class="text-2xl font-black text-yellow-500 font-serif leading-none tracking-tighter">402</span>
+                        </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-[58px] border border-dashed border-neutral-800 rounded opacity-20">
-                        <span className="text-[10px] uppercase font-bold tracking-widest">Normal MD Bonus Only</span>
+                </article>
+                <article class="bg-neutral-900 border border-neutral-800 p-5 flex flex-col justify-center rounded-md shadow-lg border-t-2 border-t-yellow-600 relative overflow-hidden">
+                    <div class="flex items-center gap-2 mb-4 leading-none tracking-widest font-black uppercase text-neutral-500 text-[10px] italic">
+                        <div class="w-1 h-3 bg-yellow-600 font-bold leading-none"></div>
+                        주간 정가 효율 분석
                     </div>
-                  )}
-                  
-                  {isHardMode && (
-                    <p className="mt-3 text-[9px] text-neutral-600 italic leading-none">
-                      ※ 하드 모드 클리어 횟수는 주간 가동 총합에 포함됩니다.
-                    </p>
-                  )}
-                </div>
-              </div>
+                    <div class="flex flex-col items-center py-2 leading-none">
+                        <p class="text-[10px] text-neutral-500 uppercase mb-2 font-bold tracking-tighter leading-none">Identities Per Week</p>
+                        <div class="text-5xl font-black text-white tracking-tighter mb-4 leading-none font-sans">
+                            <span id="res-identity-count">1.01</span> <span class="text-lg font-normal text-neutral-500 italic uppercase">ID</span>
+                        </div>
+                    </div>
+                    <div class="bg-red-950/20 border border-red-900/30 p-2 text-center rounded-sm leading-none z-10">
+                        <p class="text-[11px] text-neutral-300 leading-none">
+                            인격 1개 정가까지 약 <span id="res-weeks-needed" class="text-red-500 font-black leading-none">1.0</span>주 소요
+                        </p>
+                    </div>
+                    <div class="mt-4 p-2 bg-black/30 rounded border border-neutral-800 leading-none">
+                        <p class="text-[9px] text-neutral-500 leading-normal italic">
+                            💡 <span class="text-neutral-400 font-bold uppercase">Tip:</span> '일괄 수령'은 하드 1판으로 보너스 슬롯 3개를 모두 사용하므로, 남은 판수가 일반 거던으로 전환되어 총 점수가 더 높게 산출됩니다.
+                        </p>
+                    </div>
+                </article>
             </div>
-          </div>
-
-          {/* 리포트 그리드 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <article className="bg-neutral-900 border border-neutral-800 p-5 flex flex-col rounded-md shadow-lg">
-              <div className="flex items-center gap-2 mb-4 leading-none font-black text-neutral-500 text-[10px] uppercase tracking-widest">
-                <div className="w-1 h-3 bg-red-700"></div>
-                주간 가동 분석 리포트
-              </div>
-              
-              <div className="mb-4 p-3 bg-black/50 rounded border border-neutral-800 text-[10px] space-y-3 font-mono">
-                <div className="flex justify-between items-center leading-none">
-                  <span className="text-red-500 font-bold">보너스 가동 횟수</span>
-                  <span className="text-neutral-300 font-bold">{calculations.bonusRunsCount}회</span>
-                </div>
-                <div className="flex justify-between items-center leading-none">
-                  <span className="text-neutral-400 font-bold">일반 가동 횟수</span>
-                  <span className="text-neutral-300 font-bold">{calculations.remainingRuns}회</span>
-                </div>
-                <div className="pt-2 mt-1 border-t border-neutral-800 flex justify-between text-neutral-300 font-black leading-none">
-                  <span className="uppercase tracking-tighter text-neutral-500">주간 가동 총합</span>
-                  <span className="text-white underline underline-offset-4">{calculations.weeklyRuns}회</span>
-                </div>
-              </div>
-
-              <div className="space-y-4 flex-1">
-                <div className="flex justify-between items-end leading-none">
-                  <div className="flex flex-col leading-none">
-                    <span className="text-xs text-neutral-400 leading-none">주간 합산 레벨</span>
-                    <span className="text-[9px] text-neutral-500 leading-none tracking-tight">최종 {calculations.totalWeeklyLevels.toFixed(1)} Lv</span>
-                  </div>
-                  <span className="text-lg font-bold text-white leading-none">{calculations.flooredLevels} <small className="text-[10px] text-neutral-600 font-normal underline uppercase leading-none">Lv</small></span>
-                </div>
-                <div className="flex justify-between items-end leading-none">
-                  <span className="text-xs text-neutral-400 leading-none font-sans">파편 상자 획득</span>
-                  <span className="text-lg font-bold text-red-600 leading-none">{calculations.weeklyBoxes} <small className="text-[10px] text-neutral-600 font-normal uppercase font-serif leading-none">ea</small></span>
-                </div>
-                <div className="flex justify-between items-end pt-2 border-t border-neutral-800 leading-none font-sans">
-                  <span className="text-xs font-bold text-neutral-300 italic tracking-tighter leading-none">파편 기대값</span>
-                  <span className="text-2xl font-black text-yellow-500 font-serif leading-none tracking-tighter">{calculations.weeklyShards}</span>
-                </div>
-              </div>
-            </article>
-
-            <article className="bg-neutral-900 border border-neutral-800 p-5 flex flex-col justify-center rounded-md shadow-lg border-t-2 border-t-yellow-600 relative overflow-hidden font-sans">
-              <div className="flex items-center gap-2 mb-4 leading-none tracking-widest font-black uppercase text-neutral-500 text-[10px]">
-                <div className="w-1 h-3 bg-yellow-600 font-bold leading-none"></div>
-                주간 정가 효율 분석
-              </div>
-              <div className="flex flex-col items-center py-2 leading-none">
-                <p className="text-[10px] text-neutral-500 uppercase mb-2 font-bold tracking-tighter leading-none font-sans">Identities Per Week</p>
-                <div className="text-5xl font-black text-white tracking-tighter mb-4 leading-none font-sans">
-                  {calculations.identitiesPerWeek} <span className="text-lg font-normal text-neutral-500 italic uppercase">ID</span>
-                </div>
-              </div>
-              <div className="bg-red-950/20 border border-red-900/30 p-2 text-center rounded-sm leading-none z-10 font-sans">
-                <p className="text-[11px] text-neutral-300 leading-none font-sans">
-                  인격 1개 정가까지 약 <span className="text-red-500 font-black leading-none font-sans">{calculations.weeksForOneIdentity}</span>주 소요
-                </p>
-              </div>
-              
-              <div className="mt-4 p-2 bg-black/30 rounded border border-neutral-800 leading-none">
-                <p className="text-[9px] text-neutral-500 leading-normal italic font-sans">
-                  💡 <span className="text-neutral-400 font-bold">TIP:</span> '일괄 수령'은 하드 1판으로 보너스 슬롯 3개를 모두 사용하므로, 남은 판수가 일반 거던으로 전환되어 총 점수가 더 높게 산출됩니다.
-                </p>
-              </div>
-            </article>
-          </div>
         </main>
-
-        <footer className="mt-12 text-center border-t border-neutral-900 pt-4 leading-none">
-          <p className="text-[9px] text-neutral-800 uppercase tracking-[0.4em] font-bold italic leading-none opacity-50">Authorized Intelligence Unit</p>
+        <footer class="mt-12 text-center border-t border-neutral-900 pt-4 leading-none">
+            <p class="text-[9px] text-zinc-800 uppercase tracking-[0.4em] font-bold italic leading-none opacity-50 underline decoration-red-900">Authorized Intelligence Unit - Sazabi Custom</p>
         </footer>
-      </div>
     </div>
-  );
-};
 
-export default App;
+    <script>
+        // State
+        let dailyRuns = 3;
+        let maxEnk = 120;
+        let isHard = false;
+        let hardStyle = 'bulk'; // bulk or each
+
+        // Constants
+        const BOXES_PER_LEVEL = 3;
+        const SHARDS_PER_BOX = 2;
+        const IDENTITY_COST = 400;
+        const MD_NORMAL_LV = 3;
+        const ENK_PER_MODULE = 20;
+        const MODULE_PER_RUN = 5;
+
+        // Elements
+        const elDailyRunsInput = document.getElementById('input-daily-runs');
+        const elMaxEnkInput = document.getElementById('input-max-enk');
+        const elIsHardInput = document.getElementById('input-is-hard');
+        const elBtnBulk = document.getElementById('btn-bulk');
+        const elBtnEach = document.getElementById('btn-each');
+
+        function updateUI() {
+            // Values from state
+            const weeklyRuns = dailyRuns * 7;
+            const questLevels = 1 * 7 + 2;
+            let mdBonusLevels = 0;
+            let bonusRunsCount = 0;
+
+            if (isHard) {
+                if (hardStyle === 'bulk') {
+                    mdBonusLevels = 22.5;
+                    bonusRunsCount = 1;
+                } else {
+                    mdBonusLevels = 25;
+                    bonusRunsCount = 3;
+                }
+            } else {
+                bonusRunsCount = Math.min(weeklyRuns, 3);
+                mdBonusLevels = bonusRunsCount * 4.5;
+            }
+
+            const remainingRuns = Math.max(0, weeklyRuns - bonusRunsCount);
+            const mdTotalLevels = mdBonusLevels + (remainingRuns * MD_NORMAL_LV);
+            const totalWeeklyLevels = questLevels + mdTotalLevels;
+            const flooredLevels = Math.floor(totalWeeklyLevels);
+            const weeklyBoxes = flooredLevels * BOXES_PER_LEVEL;
+            const weeklyShards = weeklyBoxes * SHARDS_PER_BOX;
+            const identitiesPerWeek = (weeklyShards / IDENTITY_COST).toFixed(2);
+            const weeksForOne = weeklyShards > 0 ? (IDENTITY_COST / weeklyShards).toFixed(1) : "∞";
+
+            // Resources
+            const dailyNaturalEnk = 240;
+            const dailyRefillEnk = maxEnk * 2;
+            const totalDailyEnk = dailyNaturalEnk + dailyRefillEnk;
+            const totalDailyModules = Math.floor(totalDailyEnk / ENK_PER_MODULE);
+            const dailyMDModules = dailyRuns * MODULE_PER_RUN;
+            const remainingModules = totalDailyModules - dailyMDModules;
+
+            // DOM Update
+            document.getElementById('display-max-enk').textContent = maxEnk;
+            document.getElementById('display-daily-runs').textContent = dailyRuns;
+            document.getElementById('display-module-cost').innerHTML = `소모: ${dailyMDModules}모듈 <span class="text-[9px] ml-1 font-normal text-zinc-600">(${dailyMDModules * ENK_PER_MODULE} ENK)</span>`;
+            document.getElementById('display-available-modules').textContent = `수급 가능 모듈: ${totalDailyModules}개`;
+
+            // Alerts
+            const alertArea = document.getElementById('alert-area');
+            alertArea.innerHTML = '';
+            if (remainingModules < 0) {
+                alertArea.innerHTML = `
+                    <div class="bg-red-950/40 border border-red-600 p-3 rounded flex items-center gap-3 animate-pulse">
+                        <div class="text-red-500 font-bold"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4M12 17h.01"/></svg></div>
+                        <div class="text-[11px] text-red-100 font-bold leading-tight">[공급 한계 도달] 필요 모듈량이 일일 총 수급량(${totalDailyModules}개)을 초과했습니다.</div>
+                    </div>`;
+                document.getElementById('display-daily-runs').className = "text-5xl font-black leading-none tracking-tighter text-red-500";
+            } else if (remainingModules < 10) {
+                alertArea.innerHTML = `
+                    <div class="bg-orange-950/20 border border-orange-700/40 p-3 rounded flex items-center gap-3">
+                        <div class="text-orange-500 font-bold"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4M12 17h.01"/></svg></div>
+                        <div class="text-[11px] text-orange-200 font-bold leading-tight">[운용 권고] 거던 후 잔여 모듈이 <span class="text-white underline">${remainingModules}개</span>입니다. 경던 및 끈던 가동 계획에 차질이 없나 확인하세요.</div>
+                    </div>`;
+                document.getElementById('display-daily-runs').className = "text-5xl font-black leading-none tracking-tighter text-white";
+            } else {
+                document.getElementById('display-daily-runs').className = "text-5xl font-black leading-none tracking-tighter text-white";
+            }
+
+            // Hard Mode UI
+            const hardOptions = document.getElementById('hard-style-options');
+            const placeholder = document.getElementById('normal-bonus-placeholder');
+            const notice = document.getElementById('hard-notice');
+            const label = document.getElementById('hard-label');
+            
+            if (isHard) {
+                hardOptions.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                notice.classList.remove('hidden');
+                label.classList.add('text-red-500');
+            } else {
+                hardOptions.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                notice.classList.add('hidden');
+                label.classList.remove('text-red-500');
+            }
+
+            elBtnBulk.className = hardStyle === 'bulk' ? "flex-1 flex flex-col items-center p-3 rounded border border-red-800 bg-red-950/30" : "flex-1 flex flex-col items-center p-3 rounded border border-neutral-800 bg-neutral-950 hover:border-neutral-700";
+            elBtnBulk.querySelector('span:first-child').className = hardStyle === 'bulk' ? "text-xs font-black text-red-500" : "text-xs font-black text-neutral-500";
+            elBtnEach.className = hardStyle === 'each' ? "flex-1 flex flex-col items-center p-3 rounded border border-red-800 bg-red-950/30" : "flex-1 flex flex-col items-center p-3 rounded border border-neutral-800 bg-neutral-950 hover:border-neutral-700";
+            elBtnEach.querySelector('span:first-child').className = hardStyle === 'each' ? "text-xs font-black text-red-500" : "text-xs font-black text-neutral-500";
+
+            // Analysis
+            document.getElementById('res-bonus-runs').textContent = `${bonusRunsCount}회`;
+            document.getElementById('res-normal-runs').textContent = `${remainingRuns}회`;
+            document.getElementById('res-total-runs').textContent = `${weeklyRuns}회`;
+            document.getElementById('res-total-levels').textContent = `최종 ${totalWeeklyLevels.toFixed(1)} Lv`;
+            document.getElementById('res-floored-levels').textContent = flooredLevels;
+            document.getElementById('res-total-boxes').textContent = weeklyBoxes;
+            document.getElementById('res-total-shards').textContent = weeklyShards;
+            document.getElementById('res-identity-count').textContent = identitiesPerWeek;
+            document.getElementById('res-weeks-needed').textContent = weeksForOne;
+        }
+
+        // Event Listeners
+        elDailyRunsInput.addEventListener('input', (e) => { dailyRuns = parseInt(e.target.value); updateUI(); });
+        elMaxEnkInput.addEventListener('input', (e) => { maxEnk = parseInt(e.target.value); updateUI(); });
+        elIsHardInput.addEventListener('change', (e) => { isHard = e.target.checked; updateUI(); });
+        elBtnBulk.addEventListener('click', () => { hardStyle = 'bulk'; updateUI(); });
+        elBtnEach.addEventListener('click', () => { hardStyle = 'each'; updateUI(); });
+
+        updateUI();
+    </script>
+</body>
+</html>
