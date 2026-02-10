@@ -82,13 +82,26 @@
                                     </div>
                                 </div>
                                 
-                                <div class="relative pt-1">
-                                    <input type="range" id="input-daily-runs" min="1" max="15" step="1" value="3" class="w-full h-1.5 lg:h-2 rounded-lg appearance-none cursor-pointer accent-red-700 bg-neutral-800">
-                                    <div class="flex justify-between text-[10px] lg:text-xs text-neutral-600 mt-3 lg:mt-4 font-mono font-bold uppercase tracking-tighter leading-none whitespace-nowrap">
-                                        <span>Min</span>
-                                        <span id="display-available-modules" class="text-neutral-400 font-normal px-2 py-0.5 bg-black rounded-full border border-neutral-800 tracking-tighter text-[9px] lg:text-xs">24개 수급 가능</span>
-                                        <span>Max</span>
+                                <div class="flex items-center gap-3 pt-1">
+                                    <!-- 감소 버튼 -->
+                                    <button id="btn-run-minus" class="flex-none w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center bg-neutral-800 hover:bg-red-900 border border-neutral-700 rounded-lg text-white font-bold transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    </button>
+                                    
+                                    <!-- 슬라이더 -->
+                                    <div class="flex-1 relative">
+                                        <input type="range" id="input-daily-runs" min="1" max="15" step="1" value="3" class="w-full h-1.5 lg:h-2 rounded-lg appearance-none cursor-pointer accent-red-700 bg-neutral-800">
+                                        <div class="flex justify-between text-[10px] lg:text-xs text-neutral-600 mt-3 lg:mt-4 font-mono font-bold uppercase tracking-tighter leading-none whitespace-nowrap px-1">
+                                            <span>Min</span>
+                                            <span id="display-available-modules" class="text-neutral-400 font-normal px-2 py-0.5 bg-black rounded-full border border-neutral-800 tracking-tighter text-[9px] lg:text-xs">24개 수급 가능</span>
+                                            <span>Max</span>
+                                        </div>
                                     </div>
+
+                                    <!-- 증가 버튼 -->
+                                    <button id="btn-run-plus" class="flex-none w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center bg-neutral-800 hover:bg-red-900 border border-neutral-700 rounded-lg text-white font-bold transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -169,6 +182,10 @@
                             </div>
                             <span class="text-xl lg:text-3xl font-black text-white"><span id="res-floored-levels">67</span> <small class="text-[10px] text-neutral-600 font-normal uppercase">Lv</small></span>
                         </div>
+                        <div class="flex justify-between items-end border-t border-neutral-800/50 pt-3 lg:pt-4">
+                            <span class="text-[11px] lg:text-sm text-neutral-400 font-black">파편 상자 수급</span>
+                            <span id="res-total-boxes" class="text-xl lg:text-3xl font-black text-red-600 leading-none">201 <small class="text-[10px] text-neutral-600 font-normal uppercase">ea</small></span>
+                        </div>
                         <div class="flex justify-between items-center pt-3 lg:pt-5 border-t-2 border-neutral-800">
                             <span class="text-[10px] lg:text-xs font-black text-neutral-400 italic tracking-tighter uppercase">Shard Expectation</span>
                             <span id="res-total-shards" class="text-2xl lg:text-5xl font-black text-yellow-500 font-serif tracking-tighter leading-none">402</span>
@@ -204,7 +221,7 @@
 
     <script>
         /**
-         * 데이터 저장/불러오기 로직 추가
+         * 데이터 저장/불러오기 헬퍼 (샌드박스 보안 대응)
          */
         const STORAGE_KEYS = {
             DAILY_RUNS: 'lcb_md_calc_dailyRuns',
@@ -213,11 +230,28 @@
             HARD_STYLE: 'lcb_md_calc_hardStyle'
         };
 
-        // 초기 상태 설정 (저장된 값이 있으면 불러오고, 없으면 기본값 사용)
-        let dailyRuns = parseInt(localStorage.getItem(STORAGE_KEYS.DAILY_RUNS)) || 3;
-        let maxEnk = parseInt(localStorage.getItem(STORAGE_KEYS.MAX_ENK)) || 120;
-        let isHard = localStorage.getItem(STORAGE_KEYS.IS_HARD) === 'true';
-        let hardStyle = localStorage.getItem(STORAGE_KEYS.HARD_STYLE) || 'bulk';
+        function safeSave(key, value) {
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {
+                // 저장 불가능한 환경(iframe 등) 대응
+            }
+        }
+
+        function safeGet(key, defaultValue) {
+            try {
+                const val = localStorage.getItem(key);
+                return val !== null ? val : defaultValue;
+            } catch (e) {
+                return defaultValue;
+            }
+        }
+
+        // 초기 상태 설정
+        let dailyRuns = parseInt(safeGet(STORAGE_KEYS.DAILY_RUNS, "3")) || 3;
+        let maxEnk = parseInt(safeGet(STORAGE_KEYS.MAX_ENK, "120")) || 120;
+        let isHard = safeGet(STORAGE_KEYS.IS_HARD, "false") === "true";
+        let hardStyle = safeGet(STORAGE_KEYS.HARD_STYLE, "bulk");
 
         // Constants
         const BOXES_PER_LEVEL = 3;
@@ -233,8 +267,10 @@
         const elIsHardInput = document.getElementById('input-is-hard');
         const elBtnBulk = document.getElementById('btn-bulk');
         const elBtnEach = document.getElementById('btn-each');
+        const elBtnRunMinus = document.getElementById('btn-run-minus');
+        const elBtnRunPlus = document.getElementById('btn-run-plus');
 
-        // 페이지 로드 시 초기값 UI 반영
+        // 초기값 UI 반영
         elDailyRunsInput.value = dailyRuns;
         elMaxEnkInput.value = maxEnk;
         elIsHardInput.checked = isHard;
@@ -274,10 +310,12 @@
             const dailyMDModules = dailyRuns * MODULE_PER_RUN;
             const remainingModules = totalDailyModules - dailyMDModules;
 
+            // 상단 수치 업데이트
             document.getElementById('display-daily-runs').textContent = dailyRuns;
             document.getElementById('display-module-cost').innerHTML = `<span class="text-white">${dailyMDModules}</span>모듈 <span class="text-[9px] lg:text-[11px] ml-2 font-normal text-zinc-600 tracking-wider">(${dailyMDModules * ENK_PER_MODULE} ENK)</span>`;
             document.getElementById('display-available-modules').textContent = `${totalDailyModules}개 수급 가능`;
 
+            // 경고 알림
             const alertArea = document.getElementById('alert-area');
             alertArea.innerHTML = '';
             if (remainingModules < 0) {
@@ -298,6 +336,7 @@
                 document.getElementById('display-daily-runs').className = "text-3xl lg:text-6xl font-black leading-none tracking-tighter text-white";
             }
 
+            // 하드 모드 UI
             const hardOptions = document.getElementById('hard-style-options');
             const placeholder = document.getElementById('normal-bonus-placeholder');
             const label = document.getElementById('hard-label');
@@ -317,48 +356,72 @@
             elBtnEach.className = hardStyle === 'each' ? "flex-1 flex flex-col justify-center items-center rounded-xl border-2 border-red-700 bg-red-950/40 transition-all-200" : "flex-1 flex flex-col justify-center items-center rounded-xl border-2 border-neutral-800 bg-neutral-950 hover:border-neutral-700 transition-all-200";
             elBtnEach.querySelector('span:first-child').className = hardStyle === 'each' ? "text-[11px] lg:text-[14px] font-black text-red-500" : "text-[11px] lg:text-[14px] font-black text-neutral-500";
 
+            // 주간 가동 분석 리포트 업데이트
             document.getElementById('res-bonus-runs').textContent = `${bonusRunsCount}회`;
             document.getElementById('res-normal-runs').textContent = `${remainingRuns}회`;
             document.getElementById('res-total-runs').textContent = `${weeklyRuns}회`;
             document.getElementById('res-total-levels').textContent = `최종 ${totalWeeklyLevels.toFixed(1)} Lv`;
             document.getElementById('res-floored-levels').textContent = flooredLevels;
+            document.getElementById('res-total-boxes').childNodes[0].nodeValue = weeklyBoxes + " ";
             document.getElementById('res-total-shards').textContent = weeklyShards;
             document.getElementById('res-identity-count').textContent = identitiesPerWeek;
             document.getElementById('res-weeks-needed').textContent = weeksForOne;
+
+            // 슬라이더 동기화
+            elDailyRunsInput.value = dailyRuns;
         }
 
-        // Event Listeners + 데이터 저장
+        // Event Listeners
         elDailyRunsInput.addEventListener('input', (e) => { 
             dailyRuns = parseInt(e.target.value); 
-            localStorage.setItem(STORAGE_KEYS.DAILY_RUNS, dailyRuns);
+            safeSave(STORAGE_KEYS.DAILY_RUNS, dailyRuns);
             updateUI(); 
         });
+
+        elBtnRunMinus.addEventListener('click', () => {
+            if (dailyRuns > 1) {
+                dailyRuns--;
+                safeSave(STORAGE_KEYS.DAILY_RUNS, dailyRuns);
+                updateUI();
+            }
+        });
+
+        elBtnRunPlus.addEventListener('click', () => {
+            if (dailyRuns < 15) {
+                dailyRuns++;
+                safeSave(STORAGE_KEYS.DAILY_RUNS, dailyRuns);
+                updateUI();
+            }
+        });
+
         elMaxEnkInput.addEventListener('input', (e) => { 
             let val = parseInt(e.target.value);
             if(isNaN(val)) val = 0;
             maxEnk = val; 
-            localStorage.setItem(STORAGE_KEYS.MAX_ENK, maxEnk);
-            updateUI(); 
-        });
-        elIsHardInput.addEventListener('change', (e) => { 
-            isHard = e.target.checked; 
-            localStorage.setItem(STORAGE_KEYS.IS_HARD, isHard);
-            updateUI(); 
-        });
-        elBtnBulk.addEventListener('click', () => { 
-            hardStyle = 'bulk'; 
-            localStorage.setItem(STORAGE_KEYS.HARD_STYLE, hardStyle);
-            updateUI(); 
-        });
-        elBtnEach.addEventListener('click', () => { 
-            hardStyle = 'each'; 
-            localStorage.setItem(STORAGE_KEYS.HARD_STYLE, hardStyle);
+            safeSave(STORAGE_KEYS.MAX_ENK, maxEnk);
             updateUI(); 
         });
 
+        elIsHardInput.addEventListener('change', (e) => { 
+            isHard = e.target.checked; 
+            safeSave(STORAGE_KEYS.IS_HARD, isHard);
+            updateUI(); 
+        });
+
+        elBtnBulk.addEventListener('click', () => { 
+            hardStyle = 'bulk'; 
+            safeSave(STORAGE_KEYS.HARD_STYLE, hardStyle);
+            updateUI(); 
+        });
+
+        elBtnEach.addEventListener('click', () => { 
+            hardStyle = 'each'; 
+            safeSave(STORAGE_KEYS.HARD_STYLE, hardStyle);
+            updateUI(); 
+        });
+
+        // 페이지 로드 시 첫 실행
         updateUI();
     </script>
 </body>
-
 </html>
-
